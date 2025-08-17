@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sıvı Arkaplan Web Sitesi</title>
+    <!-- Inter yazı tipini Google Fonts'tan yükle -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN'ini yükle -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: -1;
+        }
+        /* Spinner animasyonu */
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #ffffff;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen flex items-center justify-center relative">
+    <!-- Arka plan gradyanı için ana kapsayıcı -->
+    <div class="absolute inset-0 bg-gradient-to-br from-blue-900 via-gray-900 to-black opacity-90 -z-10"></div>
+
+    <!-- Dinamik arka plan elementleri için canvas -->
+    <canvas id="myCanvas"></canvas>
+
+    <!-- Sayfanın ortasındaki içerik kartı -->
+    <div class="max-w-xl mx-auto p-8 rounded-2xl shadow-xl backdrop-blur-sm bg-white/10 border border-white/20 text-center space-y-6 z-10">
+        <h1 class="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-white">
+            Sitenize Hoş Geldiniz
+        </h1>
+        <p class="text-base sm:text-lg text-gray-300 leading-relaxed">
+            Bu, baloncuklar ve balıklar gibi dinamik elementlerle süslenmiş, sanatsal bir tasarıma sahip web sitesi.
+        </p>
+        <div class="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4 pt-4">
+            <button class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full transition duration-300 transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                Daha Fazla Bilgi
+            </button>
+            <a href="#" class="text-gray-300 hover:text-white transition duration-300">
+                Keşfet
+            </a>
+        </div>
+
+        <!-- Gemini API Destekli Yaratıcı Düşünce Üretici -->
+        <div class="mt-12 pt-8 border-t border-gray-700 space-y-4 text-left">
+            <h2 class="text-2xl font-semibold text-white">✨ Yaratıcı Düşünce Üretici</h2>
+            <p class="text-gray-300">İlham almak için aşağıdaki butona tıklayın ve derin okyanuslara ait kısa bir metin oluşturun.</p>
+            
+            <div class="flex items-center space-x-4">
+                <button id="generateBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full transition duration-300 transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                    İlham Veren Metin Oluştur ✨
+                </button>
+                <div id="loadingIndicator" class="hidden spinner"></div>
+            </div>
+
+            <div id="resultArea" class="mt-4 p-4 rounded-xl bg-gray-800 text-gray-300 text-sm whitespace-pre-wrap min-h-[100px] flex items-center justify-center">
+                Oluşturulan yaratıcı metin burada görünecek.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('myCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+        let bubbles = [];
+        let fish = [];
+        const maxBubbles = 20;
+        const maxFish = 10;
+
+        // Canvas boyutlarını ayarlar
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+
+        // Baloncuk sınıfı (içinde insan figürü ile)
+        class Bubble {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                // Baloncuklar alttan veya yanlardan başlar
+                const side = Math.random();
+                if (side < 0.5) { // Sol veya sağ taraf
+                    this.x = side < 0.25 ? 0 : width;
+                    this.y = Math.random() * height;
+                } else { // Alt
+                    this.x = Math.random() * width;
+                    this.y = height;
+                }
+                this.radius = Math.random() * 20 + 10;
+                this.vy = -Math.random() * 0.5 - 0.2;
+                this.vx = (Math.random() - 0.5) * 0.5;
+                this.alpha = 0.5;
+                this.color = Math.random() < 0.5 ? '#b8004f' : '#ffffff'; // Bordo veya beyaz/gri
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.alpha -= 0.002;
+                if (this.alpha <= 0 || this.y < 0) {
+                    this.reset();
+                }
+            }
+
+            draw() {
+                // Dış baloncuk çizimi
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${parseInt(this.color.substring(1,3), 16)}, ${parseInt(this.color.substring(3,5), 16)}, ${parseInt(this.color.substring(5,7), 16)}, ${this.alpha})`;
+                ctx.fill();
+
+                // Baloncuğun içindeki "insan" çizimi
+                const personRadius = this.radius * 0.2;
+                const personColor = this.color === '#ffffff' ? '#b8004f' : '#ffffff'; // Kontrast için rengi tersine çevirir
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, personRadius, 0, Math.PI * 2);
+                ctx.fillStyle = personColor;
+                ctx.fill();
+            }
+        }
+
+        // Balık sınıfı
+        class Fish {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.direction = Math.random() < 0.5 ? 1 : -1; // 1 sağ, -1 sol
+                this.x = this.direction === 1 ? -50 : width + 50;
+                this.y = Math.random() * height;
+                this.size = Math.random() * 15 + 10;
+                this.speed = Math.random() * 0.5 + 0.5;
+                this.color = Math.random() < 0.5 ? '#b8004f' : '#4a90e2'; // Bordo veya mavi
+            }
+
+            update() {
+                this.x += this.speed * this.direction;
+                if ((this.direction === 1 && this.x > width + 50) || (this.direction === -1 && this.x < -50)) {
+                    this.reset();
+                }
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.direction === -1 ? Math.PI : 0);
+
+                // Balık gövdesini çizer (basit bir üçgen)
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(this.size * 2, this.size * 0.8);
+                ctx.lineTo(this.size * 2, -this.size * 0.8);
+                ctx.closePath();
+                ctx.fill();
+
+                // Balık kuyruğunu çizer (daha küçük bir üçgen)
+                ctx.beginPath();
+                ctx.moveTo(this.size * 2, 0);
+                ctx.lineTo(this.size * 2.5, this.size * 0.5);
+                ctx.lineTo(this.size * 2.5, -this.size * 0.5);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        // Başlatma
+        function init() {
+            resizeCanvas();
+            for (let i = 0; i < maxBubbles; i++) {
+                bubbles.push(new Bubble());
+            }
+            for (let i = 0; i < maxFish; i++) {
+                fish.push(new Fish());
+            }
+        }
+
+        // Ana animasyon döngüsü
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+
+            // Baloncukları güncelle ve çiz
+            for (let i = 0; i < bubbles.length; i++) {
+                bubbles[i].update();
+                bubbles[i].draw();
+            }
+
+            // Balıkları güncelle ve çiz
+            for (let i = 0; i < fish.length; i++) {
+                fish[i].update();
+                fish[i].draw();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // Olay dinleyicileri
+        window.addEventListener('resize', resizeCanvas);
+        window.onload = function() {
+            init();
+            animate();
+        };
+
+        // Yeni eklenen Gemini API özelliği için JavaScript
+        document.addEventListener('DOMContentLoaded', () => {
+            const generateBtn = document.getElementById('generateBtn');
+            const resultArea = document.getElementById('resultArea');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+
+            generateBtn.addEventListener('click', async () => {
+                // Yüklenme durumunu göster
+                resultArea.innerText = '';
+                loadingIndicator.classList.remove('hidden');
+                
+                // Gemini için kullanılacak prompt'u (istem) oluştur
+                const prompt = `Write a short, poetic paragraph in Turkish about a magical, deep-sea world where fish and glowing bubbles drift aimlessly, conveying a sense of calm and mystery.`;
+
+                // Gemini API payload'u
+                const payload = {
+                    contents: [{
+                        role: "user",
+                        parts: [{ text: prompt }]
+                    }]
+                };
+
+                const apiKey = ""; // Canvas ortamı için boş bırak
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+                let retries = 0;
+                const maxRetries = 3;
+                let response;
+
+                try {
+                    while (retries < maxRetries) {
+                        try {
+                            // API çağrısını yap
+                            response = await fetch(apiUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            });
+
+                            if (response.status === 429) {
+                                // Oran sınırlaması için üstel geri çekilme (exponential backoff)
+                                const delay = Math.pow(2, retries) * 1000;
+                                retries++;
+                                await new Promise(resolve => setTimeout(resolve, delay));
+                                continue;
+                            }
+                            
+                            if (!response.ok) {
+                                throw new Error(`API çağrısı başarısız oldu: ${response.status}`);
+                            }
+
+                            const result = await response.json();
+                            
+                            // Yanıt yapısını kontrol et
+                            if (result.candidates && result.candidates.length > 0 &&
+                                result.candidates[0].content && result.candidates[0].content.parts &&
+                                result.candidates[0].content.parts.length > 0) {
+                                
+                                const text = result.candidates[0].content.parts[0].text;
+                                resultArea.innerText = text;
+                            } else {
+                                throw new Error('API\'den geçersiz yanıt yapısı.');
+                            }
+
+                            // Başarılı olursa, yeniden deneme döngüsünden çık
+                            break;
+
+                        } catch (error) {
+                            console.error('Fetch hatası:', error);
+                            if (retries === maxRetries - 1) {
+                                resultArea.innerText = 'Metin oluşturulurken bir hata oluştu. Lütfen daha sonra tekrar deneyin.';
+                                throw error; // Maksimum yeniden denemeden sonra hatayı tekrar fırlat
+                            }
+                            retries++;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Yeniden denemelerden sonraki son hata:', error);
+                    resultArea.innerText = 'Metin oluşturulurken bir hata oluştu. Lütfen daha sonra tekrar deneyin.';
+                } finally {
+                    // Yüklenme durumunu gizle
+                    loadingIndicator.classList.add('hidden');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
